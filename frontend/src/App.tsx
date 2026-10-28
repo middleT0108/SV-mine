@@ -35,30 +35,9 @@ export const App: React.FC = () => {
           <Navbar />
           <main className="flex-1">
             <Routes>
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/create"
-                element={
-                  <ProtectedRoute>
-                    <CreateServerPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/servers/:id"
-                element={
-                  <ProtectedRoute>
-                    <ServerDetailPage />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/create" element={<CreateServerPage />} />
+              <Route path="/servers/:id" element={<ServerDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

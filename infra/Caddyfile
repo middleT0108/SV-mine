@@ -1,0 +1,34 @@
+{
+  # Global options
+  email your-email@example.com
+}
+
+# Replace :80 with your domain (e.g., api-svmine.duckdns.org) for automatic SSL
+:80, :443 {
+  # Reverse proxy WebSocket and REST endpoints to backend
+  handle /api/* {
+    reverse_proxy backend:3001
+  }
+
+  handle /ws/* {
+    reverse_proxy backend:3001 {
+      header_up Host {host}
+      header_up X-Real-IP {remote_host}
+    }
+  }
+
+  # Health check endpoint
+  handle /health {
+    reverse_proxy backend:3001
+  }
+
+  # Uptime Kuma monitoring dashboard
+  handle_path /uptime* {
+    reverse_proxy uptime-kuma:3001
+  }
+
+  # Fallback response
+  handle {
+    respond "SV-mine Backend Gateway Active. Please connect via Frontend UI or API." 200
+  }
+}

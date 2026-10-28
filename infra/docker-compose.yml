@@ -1,0 +1,99 @@
+version: '3.8'
+
+networks:
+  svmine-net:
+    driver: bridge
+
+volumes:
+  svmine-data:
+    driver: local
+  svmine-backups:
+    driver: local
+  svmine-router:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+  uptime-kuma-data:
+    driver: local
+
+services:
+  # Caddy Reverse Proxy - Automatic Let's Encrypt / ZeroSSL HTTPS certificates
+  caddy:
+    image: caddy:2-alpine
+    container_name: svmine-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - svmine-net
+    depends_on:
+      - backend
+
+  # Core Backend API Service (Node.js + Express + Dockerode + WebSockets)
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: svmine-backend
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-super_secure_production_secret_key_change_me}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
+      - DATABASE_PATH=/app/data/sv_mine.sqlite
+      - MC_DATA_DIR=/var/minecraft/servers
+      - MC_BACKUP_DIR=/var/minecraft/backups
+      - MC_ROUTER_ROUTES_FILE=/var/minecraft/router/routes.json
+      - MAX_BACKUP_COPIES=${MAX_BACKUP_COPIES:-3}
+      - HOST_PUBLIC_IP=${HOST_PUBLIC_IP:-}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN:-}
+      - DUCKDNS_BASE_DOMAIN=${DUCKDNS_BASE_DOMAIN:-duckdns.org}
+      - MAX_SERVERS_PER_USER=${MAX_SERVERS_PER_USER:-2}
+      - MAX_RAM_MB_PER_SERVER=${MAX_RAM_MB_PER_SERVER:-6144}
+      - DOCKER_SOCKET=/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/minecraft/servers:/var/minecraft/servers
+      - /var/minecraft/backups:/var/minecraft/backups
+      - /var/minecraft/router:/var/minecraft/router
+      - svmine-data:/app/data
+    networks:
+      - svmine-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # itzg/mc-router - High performance SNI/Handshake reverse proxy for Minecraft
+  # Allows multiple servers to share the single standard 25565 port
+  mc-router:
+    image: itzg/mc-router:latest
+    container_name: svmine-mc-router
+    restart: unless-stopped
+    ports:
+      - "25565:25565"
+    environment:
+      - MAPPING_FILE=/routes.json
+      - API_BINDING=:8080
+    volumes:
+      - /var/minecraft/router/routes.json:/routes.json:ro
+    networks:
+      - svmine-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Uptime Kuma - Ultra lightweight 0-cost monitoring (replaces heavy Prometheus + Grafana)
+  uptime-kuma:
+    image: louislam/uptime-kuma:1-alpine
+    container_name: svmine-uptime-kuma
+    restart: unless-stopped
+    volumes:
+      - uptime-kuma-data:/app/data
+    networks:
+      - svmine-net
